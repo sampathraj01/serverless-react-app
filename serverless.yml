@@ -1,0 +1,91 @@
+# "org" ensures this Service is used with the correct Serverless Framework Access Key.
+org: introbyte
+# "app" enables Serverless Framework Dashboard features and sharing them with other Services.
+app: react-ecom
+# "service" is the name of this project. This will also be added to your AWS resource names.
+service: serverless-react-app
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: us-east-1
+  logs:
+    restApi:
+      accessLogging: false
+      executionLogging: false
+  environment: 
+    USER_POOL_ID: ${self:custom.userPoolId} 
+    USER_POOL_CLIENT_ID: ${self:custom.userPoolClientId} 
+    REGION: us-east-1 
+
+custom: 
+  userPoolId: !Ref CognitoUserPool 
+  userPoolClientId: !Ref CognitoUserPoolClient 
+
+plugins: 
+  - serverless-offline 
+  - serverless-dotenv-plugin 
+
+functions:
+  login:
+    handler: backend/src/handlers/auth/login.main
+    events:
+      - http:
+          path: auth/login
+          method: post
+
+  adminCreateUser:
+    handler: backend/src/handlers/admin/createUser.main
+    events:
+      - http:
+          path: admin/create-user
+          method: post
+
+resources: 
+  Resources:
+    CognitoUserPool: 
+      Type: AWS::Cognito::UserPool 
+      Properties: 
+        UserPoolName: user-pool 
+        AdminCreateUserConfig: 
+          AllowAdminCreateUserOnly: true 
+        Policies: 
+          PasswordPolicy: 
+            MinimumLength: 8 
+            RequireNumbers: true 
+            RequireUppercase: true 
+
+    CognitoUserPoolClient: 
+      Type: AWS::Cognito::UserPoolClient 
+      Properties: 
+        ClientName: user-pool-client 
+        UserPoolId: !Ref CognitoUserPool 
+        GenerateSecret: false 
+        ExplicitAuthFlows: 
+          - ADMIN_NO_SRP_AUTH 
+
+    CognitoAdminGroup: 
+      Type: AWS::Cognito::UserPoolGroup 
+      Properties: 
+        GroupName: admin 
+        UserPoolId: !Ref CognitoUserPool 
+
+    CognitoUserGroup: 
+      Type: AWS::Cognito::UserPoolGroup 
+      Properties: 
+        GroupName: user 
+        UserPoolId: !Ref CognitoUserPool 
+
+package:
+  individually: true
+  exclude:
+    - node_modules/**         # Exclude all node_modules
+    - .git/**                 # Exclude git files
+    - .vscode/**              # Exclude VS Code folder
+    - frontend/**             # Exclude React frontend files
+    - .serverless/**          # Exclude serverless build artifacts
+    - "*/.log"                # Exclude log files
+  include:
+    - backend/src/**          # Include only backend source files
+    - backend/package.json    # Include package.json for backend
+    - backend/node_modules/** # Include only required backend dependencies
